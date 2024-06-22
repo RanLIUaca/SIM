@@ -1,9 +1,12 @@
 # SIM
-SIM is a probabilistic generative model for sequence interaction. It can be trained only by the paired binding sequences.
+`SIM` is a probabilistic generative model for sequence interaction. It can be trained only by the paired binding sequences.
+
+<!-- framework.png -->
+
 
 ## Installation
 You can install the released version of SIM from GitHub with:
-1. Clone the GitHub repository and move to the SIM directory
+1. Clone the GitHub repository and move to the directory
 ```bash
 git clone https://github.com/RanLIUaca/SIM
 cd SIM/sim/sim
@@ -21,8 +24,8 @@ conda install pip
 pip install .
 ```
 
-4. To test your installation, run the following command:
-..
+Then you can enter the python and test the package
+...
 
 
 
