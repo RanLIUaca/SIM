@@ -1,105 +1,13 @@
 import pandas as pd
 import numpy as np
-import warnings
-from functools import reduce,partial
 import multiprocessing as mp
 from copy import deepcopy
 import datetime
 import time
 import os
 
-import matplotlib.pyplot as plt
-from scipy.stats import spearmanr, mannwhitneyu
-from sklearn.metrics import precision_recall_fscore_support,confusion_matrix,matthews_corrcoef
-from sklearn.metrics import PrecisionRecallDisplay, RocCurveDisplay, average_precision_score
-
 
 sleep_time = 0.1
-# generate negative samples (randomly shuffle)
-def generate_negatives(receptor, peptide, times = 1):
-    pep_index = np.unique(peptide)
-    negative_data = np.array(list(map(lambda x: np.random.choice(np.setdiff1d(pep_index, x), 
-                                                                size=times, replace = False), list(peptide)))).flatten()
-    rep_receptor = np.repeat(receptor, times)
-    return(rep_receptor, negative_data)
-
-
-def combine_pos_neg_data(receptor:list, peptide:list, times = 1, seed = 2022):
-    np.random.seed(seed)
-    n = len(receptor)
-    n_receptor, n_peptide = generate_negatives(receptor, peptide, times = times)
-    binders = np.concatenate((np.ones(n, dtype=int), np.zeros(n*times, dtype=int)))
-    final_receptor = np.concatenate((receptor, n_receptor))
-    final_peptide = np.concatenate((peptide, n_peptide))
-    full_data = pd.DataFrame({'receptor':final_receptor, 'peptide':final_peptide, 'binder':binders})
-    return full_data
-
-# raw_data: the first col: receptor; the second col: peptide (binding pairs)
-# assign peptides different from the origin one to each receptor sequence 
-def k_fold_generate(raw_data:pd.DataFrame, seed = 2022, k_fold = 5, 
-store_path = '', additional_colname = []):
-    np.random.seed(seed)
-    all_index = len(range(raw_data.shape[0]))
-    a = np.random.permutation(all_index)
-    fold_index = np.array_split(a, k_fold)
-    for i in range(k_fold):
-        temp_fold_data = raw_data.iloc[fold_index[i],:]
-        temp_final_data = combine_pos_neg_data(temp_fold_data.iloc[:,0],
-        temp_fold_data.iloc[:,1])
-        for temp_name in additional_colname:
-            temp_final_data.loc[:,temp_name] = temp_fold_data.loc[:,temp_name].to_list()+ \
-                temp_fold_data.loc[:,temp_name].to_list()
-        temp_final_data.to_csv(store_path + str(i)+'_fold_data.csv', index=False, doublequote = False)
-
-def read_folds(k_fold = 5, store_path = ''):
-    fold_data = []
-    for i in range(k_fold):
-        temp_fold = pd.read_csv(store_path+ str(i)+'_fold_data.csv',
-        header=0, na_filter = False)
-        fold_data.append(temp_fold)
-    return fold_data
-
-def combine_folds(data_list:list):
-    results = reduce(lambda x,y: pd.concat([x,y],ignore_index=True), data_list)
-    return results
-
-# calculate the performance metrics of the prediction results
-# pred_real_col: a list contain the column names of predictions (the first name) and real scores (the second)
-def cal_metrics(predictions:pd.DataFrame, pred_real_col:list = ['pred_score', 'score'],
-pred_threshold = 0.5, real_threshold = 0, store_path = ''):
-    coef, p1 = spearmanr(np.array(predictions[pred_real_col[1]]), np.array(predictions[pred_real_col[0]]), 
-        alternative = 'greater')
-    
-    xx = predictions[predictions[pred_real_col[1]]>real_threshold][pred_real_col[0]]
-    yy = predictions[predictions[pred_real_col[1]]<=real_threshold][pred_real_col[0]]
-    U1, p2 = mannwhitneyu(xx, yy, alternative = 'greater')
-    temp_AUC = U1/len(np.array(xx))/len(np.array(yy))
-    temp_real = np.where(predictions[pred_real_col[1]]>real_threshold,1,0)
-    temp_ap = average_precision_score(temp_real, predictions[pred_real_col[0]])
-
-    temp_pred = np.where(predictions[pred_real_col[0]]>pred_threshold,1,0)
-    tn, fp, fn, tp = confusion_matrix(temp_real, temp_pred).ravel()
-    tpr = tp/(tp+fn)
-    fdr = fp/(fp+tn)
-    matthews = matthews_corrcoef(temp_real, temp_pred)
-    precision, recall, F1, _ = precision_recall_fscore_support(temp_real, temp_pred, average='binary')
-    metric_result = pd.DataFrame({'Spearman_coe':coef, 'Spearman_p':p1, 
-    'AUC':temp_AUC, 'AUC_p':p2, 'AP':temp_ap,
-    'TPR':tpr, 'FDR':fdr, 'MCC':matthews,
-    'Precision': precision, 'Recall': recall, 'F1': F1}, index = [0,])
-    metric_result.to_csv(store_path +'_pred_metrics.csv', index=False, doublequote = False)
-
-    ## plot
-    # fig, ax = plt.subplots(nrows=1,ncols=2,figsize=(12, 6))
-    # display1 = RocCurveDisplay.from_predictions(predictions[pred_real_col[1]], 
-    # predictions[pred_real_col[0]], name= 'ROC',ax = ax[0])
-    # display2 = PrecisionRecallDisplay.from_predictions(predictions[pred_real_col[1]], 
-    # predictions[pred_real_col[0]], name= 'Precision_Recall',ax = ax[1])
-    # plt.savefig(os.path.join(store_path+ '_metric.pdf'))
-    # plt.close()
-    return metric_result
-
-    
 
 # check the boundary and return the result
 # if sel_index is out of the boundary, return 0
@@ -111,7 +19,8 @@ def get_value(sel_array, sel_index):
     else:
         return(0.)
 
-def read_para(store_path, p2 = False):
+
+def read_para(store_path):
     init_dis = np.loadtxt(store_path+'_'+'init_dis.txt')
     trans_mat = np.loadtxt(store_path+'_'+'trans_mat.txt')
     px = np.loadtxt(store_path+'_'+'px.txt')
@@ -123,32 +32,9 @@ def read_para(store_path, p2 = False):
     dire_dis = []
     for i in range(trans_mat.shape[0]):
         dire_dis.append(np.loadtxt(store_path+'_'+str(i)+'dire_dis.txt'))
-    
-    if p2:
-        px2 = np.loadtxt(store_path+'_'+'px2.txt')
-        py2 = np.loadtxt(store_path+'_'+'py2.txt')
-        return init_dis, trans_mat,px, py, pm, p_mx, p_my, dire_dis, px2, py2
-    else:
-        return init_dis, trans_mat,px, py, pm, p_mx, p_my, dire_dis
 
+    return init_dis, trans_mat,px, py, pm, p_mx, p_my, dire_dis
 
-def cal_score_mat(pm, p_mx, p_my, pseudo_count = 1e-15):
-    if np.any(p_mx==0) or np.any(p_my==0) or np.any(pm):
-        p_mx += pseudo_count
-        p_mx = p_mx/p_mx.sum()
-        p_my += pseudo_count
-        p_my = p_my/p_my.sum()
-        pm += pseudo_count
-        pm = pm/pm.sum()
-    score_mat = pm.copy()
-    for i in range(pm.shape[0]):
-        for j in range(pm.shape[1]):
-            score_mat[i,j] = np.log(pm[i,j])-np.log(p_mx[i])-np.log(p_my[j])
-    
-    return np.round(score_mat,1)
-    # import seaborn as sns
-    # from matplotlib import pyplot as plt
-    # sns.heatmap(score_mat,annot = True,cbar = False,cmap = "Purples")
 
 # assign the states to each residue on the sequences
 def assign_one_state_seq(seq_zip):
@@ -162,18 +48,26 @@ def assign_one_state_seq(seq_zip):
             y_state.append(state_seq[i])
     return x_state, y_state
 
+
 # compare the difference between two lists and calculate the number of the same elements
 def comp_list(list1, list2, specific_state = None):
     if len(list1) == len(list2):
         len_list = len(list1)
         count_same = 0
+        total_specific = 0
         for i in range(len_list):
             if list1[i] == list2[i]:
-                count_same += 1
+                if specific_state != None:
+                    if list1[i] == specific_state:
+                        count_same += 1
+                        total_specific += 1
+                else:
+                    count_same += 1
         total_n = len_list
         return count_same, total_n
     else:
         raise ValueError('The length of list1 is not the same as that of list2.')
+
 
 # calculate the difference between our estimated hidden parameters and the real ones
 def diff_real_state_dire(est_state_seq, est_dire_seq, real_state_seq, real_dire_seq):
@@ -212,7 +106,7 @@ aa_kinds = 'ARNDCQEGHILKMFPSTWYV'
 for v, k in enumerate(aa_kinds):
     obs2int_dict[k] = int(v)
 
-class dhmm:
+class sim:
     def __init__(self,  mec_state = ['x','y','m'], state_d= [[(1,0)],[(0,1)],[(1,1)]], 
         obs2int_dict = obs2int_dict, state2int_dict = {'X':0 , 'Y':1, 'M':2}, 
     init_dis = None, trans_mat = None, 
@@ -508,41 +402,6 @@ class dhmm:
 
         return int_state_seq, state_seq, dire_seq
 
-    
-
-    def get_one_contact(self, trans_data):
-        int_state_seq, _, dire_seq = self.cal_one_viterbi(trans_data)
-        temp_result = []
-        cur_loc = np.array([0,0])
-        for i in range(len(int_state_seq)):
-            temp_dict = dict()
-            if self.mec_state[int_state_seq[i]] == 'm':
-                for lx in range(dire_seq[i][0]):
-                    for ly in range(dire_seq[i][1]):
-                        temp_dict['seq1_res_id'] = cur_loc[0]+lx
-                        temp_dict['seq1_res_name'] = self.int2obs_dict[trans_data[0][cur_loc[0]+lx]]
-                        temp_dict['seq2_res_id'] = cur_loc[1]+ly
-                        temp_dict['seq2_res_name'] = self.int2obs_dict[trans_data[1][cur_loc[1]+ly]]
-                temp_result.append(temp_dict)
-            cur_loc = cur_loc + np.array(dire_seq[i])
-            
-        final_result = pd.DataFrame(temp_result)
-        return final_result
-
-    def get_all_contact(self, trans_full_data, parallel = True, cores = 30):
-        if parallel:
-            pool = mp.Pool(processes = cores)
-            all_contact = pool.map(self.get_one_contact, trans_full_data)
-            pool.close()
-            pool.join(); time.sleep(sleep_time)
-        else:
-            all_contact = list(map(self.get_one_contact, trans_full_data))
-        total_result = pd.DataFrame()
-        for i in range(len(all_contact)):
-            all_contact[i].insert(0, 'pair_index', i)
-            total_result = pd.concat([total_result, all_contact[i]], ignore_index=True)
-        return total_result
-
 
     def cal_all_viterbi(self, trans_full_data, parallel = True, cores = 30):
         if parallel:
@@ -723,40 +582,31 @@ class dhmm:
         return all_hx, all_hy, all_hmx, all_hm
 
 
-    # def update_con_pm(self, ij, all_nu, all_hm):
-    #         i, j = ij
-    #         ttpp = sum([np.sum(nu[:,:,:,:,:]*hm[:,:,:,:,:,i,j]) for nu,hm in zip(all_nu,all_hm)])
-    #         return ttpp
+    def pred_one_seq_state(self, trans_data):
+        _, state_seq, dire_seq = self.cal_one_viterbi(trans_data)
+        x_state, y_state = assign_one_state_seq((state_seq, dire_seq))
+        final_x_state = ''.join(x_state)
+        final_y_state = ''.join(y_state)
+        final_state_seq = ''.join(state_seq)
+        return final_x_state, final_y_state, final_state_seq
 
-    
-    # def update_con_pm_all(self, all_nu, all_hm, parallel = True, cores = 30):
-    #     obs_n = len(self.obs2int_dict)
-    #     partial_update_con_pm = partial(self.update_con_pm, all_nu = all_nu, all_hm = all_hm)
-    #     ij_list = []
-    #     for i in range(obs_n):
-    #         for j in range(obs_n):
-    #             if i<=j:
-    #                 ij_list.append([i,j])
-
-    #     if parallel:
-    #         pool = mp.Pool(processes = cores)
-    #         all_con_pm = pool.map(partial_update_con_pm, ij_list)
-    #         pool.close()
-    #         pool.join(); time.sleep(sleep_time)
-    #     else:
-    #         all_con_pm = list(map(partial_update_con_pm, ij_list))
-
-    #     temp_conditional_pm = np.zeros([obs_n, obs_n])
-    #     for temp_index, ttpp  in enumerate(all_con_pm):
-    #         i,j = ij_list[temp_index]
-    #         if i<=j:
-    #             if i==j:
-    #                 temp_conditional_pm[i,j] = 2*ttpp
-    #             else:
-    #                 temp_conditional_pm[i,j] = ttpp
-    #                 temp_conditional_pm[j,i] = ttpp
-
-    #     return temp_conditional_pm
+    def pred_all_seq_state(self, trans_full_data, parallel = True, cores = 30):
+        if parallel:
+            pool = mp.Pool(processes = cores)
+            all_seq_state = pool.map(self.pred_one_seq_state, trans_full_data)
+            pool.close()
+            pool.join(); time.sleep(sleep_time)
+        else:
+            all_seq_state = list(map(self.pred_one_seq_state, trans_full_data))
+        col_x, col_y, col_all = [], [], []
+        for i in range(len(all_seq_state)):
+            col_x.append(all_seq_state[i][0])
+            col_y.append(all_seq_state[i][1])
+            col_all.append(all_seq_state[i][2])
+            # if i==1: 
+            #     print(col_x);print(col_y);print(col_all)
+        total_result = pd.DataFrame({'x_state': col_x, 'y_state': col_y, 'all_state':col_all})
+        return total_result
 
     def update_para(self, trans_full_data,
     parallel = True, cores = 30, pesudo_count = 0.0001):
@@ -841,17 +691,10 @@ class dhmm:
         for k in range(obs_n):
             self.px[k] = sum([np.sum(nu[:,:,:,:,:]*hx[:,:,:,:,:,k]) for nu,hx in zip(all_nu,all_hx)])
             self.py[k] = sum([np.sum(nu[:,:,:,:,:]*hy[:,:,:,:,:,k]) for nu,hy in zip(all_nu,all_hy)])
-            # self.p_mx[k] = sum([np.sum(nu[:,:,:,:,:]*hmx[:,:,:,:,:,k]) for nu,hmx in zip(all_nu,all_hmx)])
         self.px += pesudo_count
         self.py += pesudo_count
         self.px = self.px/self.px.sum()
         self.py = self.py/self.py.sum()
-        # self.p_mx += pesudo_count
-        # self.p_mx = self.p_mx/self.p_mx.sum()
-        # self.p_my = self.p_mx
-
-        # ee_time = time.time()
-        # print('pxpypmx_time=',ee_time-ss_time)
 
         # update emition distribution (conditional distribution)
         # ss_time = time.time()
@@ -867,7 +710,6 @@ class dhmm:
                         temp_conditional_pm[i,j] = ttpp
                         temp_conditional_pm[j,i] = ttpp
         temp_conditional_pm += pesudo_count
-        # temp_conditional_pm = (temp_conditional_pm.T/np.sum(temp_conditional_pm,1)).T
         # self.pm = (temp_conditional_pm.T*self.p_mx).T
         self.pm = temp_conditional_pm/temp_conditional_pm.sum()
         self.p_mx = (self.pm@np.ones(obs_n).reshape(-1,1)).squeeze()
@@ -1035,103 +877,35 @@ class dhmm:
 
         return seq_data, state_data, dire_data
 
-    # check the xy parameter
-    # x state: 1; y state: 2
-    def cal_f(self):
-        state_n = len(self.mec_state)
-        obs_n = len(self.obs2int_dict)
-        result = np.zeros([state_n,state_n,obs_n,obs_n])
-        for i in range(state_n):
-            for j in range(state_n):
-                for x0 in range(obs_n):
-                    for y0 in range(obs_n):
-                        temp_up = self.trans_mat[i,0]*self.trans_mat[0,1]*self.trans_mat[1,j]*self.px[x0]*self.py[y0]
-                        temp_low = self.trans_mat[i,2]*self.trans_mat[2,j]*self.pm[x0,y0]
-                        if temp_up==0:
-                            result[i,j,x0,y0] = 0
-                        elif temp_low ==0:
-                            result[i,j,x0,y0] = 1
-                        else:
-                            result[i,j,x0,y0] = (temp_up/temp_low)>1
-        return result
+    def generate_one_neg_data(self, seq_len):
+        x_seq = ''.join(np.random.choice(list(obs2int_dict.keys()), p = self.px,
+                                               size=seq_len, replace = True))
+        y_seq = ''.join(np.random.choice(list(obs2int_dict.keys()), p = self.py,
+                                               size=seq_len, replace = True))
+        return [x_seq, y_seq]
 
-    def check_xy(self):
-        ppi1 = self.trans_mat[:,0]/np.sum(self.trans_mat[:,0])
-        ppj1 = self.trans_mat[1,:]
-        ppi2 = self.trans_mat[:,2]/np.sum(self.trans_mat[:,2])
-        ppj2 = self.trans_mat[2,:]
-        temp1 = np.dot(ppi1.reshape([-1,1]),ppj1.reshape([1,-1]))
-        temp2 = np.dot(ppi2.reshape([-1,1]),ppj2.reshape([1,-1]))
+    def generate_neg_data(self, seq_len, data_size, seed=2022):
+        np.random.seed(seed)
+        neg_data = [self.generate_one_neg_data(seq_len) for _ in range(data_size)]
+        return neg_data
 
-        f = self.cal_f()
-        # print(f)
-        obs_n = len(self.obs2int_dict)
-        pxy = 0
-        pmm = 0
-        for x0 in range(obs_n):
-            for y0 in range(obs_n):
-                pxy += (f[:,:,x0,y0]*temp1*self.px[x0]*self.py[y0]).sum()
-                pmm += (f[:,:,x0,y0]*temp2*self.pm[x0, y0]).sum()
-        return pxy, pmm
-
-    # just for check
-    # def count_obs(self, obs_list):
-    #     obs_n = len(self.obs2int_dict)
-    #     letter_count = np.zeros(obs_n,dtype=int)
-    #     for i in obs_list:
-    #         letter_count[i] += 1
-    #     return letter_count
-
-    def cal_p2(self, trans_full_data, store_path = '', store = False):
-        store_digit = '%.'+str(10)+'f'
-        obs_x, obs_y = [], []
-        # # non-unique
-        # for i in trans_full_data:
-        #     obs_x += i[0]
-        #     obs_y += i[1]
-
-        # unique
-        seq1_list, seq2_list = [], []
-        for i in trans_full_data:
-            seq1_list.append(i[0])
-            seq2_list.append(i[1])
-        seq1_list = np.unique(seq1_list)
-        seq2_list = np.unique(seq2_list)
-        for i in seq1_list:
-            obs_x += i
-        for j in seq2_list:
-            obs_y += j
-            
-        px2 = self.count_obs(obs_x)
-        self.px2 = px2/px2.sum()
-        py2 = self.count_obs(obs_y) 
-        self.py2 = py2/py2.sum()
-        if store:
-            np.savetxt(store_path+'_'+'px2.txt', self.px2, fmt=store_digit)
-            np.savetxt(store_path+'_'+'py2.txt', self.py2, fmt=store_digit)
-
-    # the binding likelihood ratio
+    
+    # the binding likelihood ratio 
+    # binding ratio
     def cal_one_lr(self, trans_data):
         x_len, y_len = len(trans_data[0]), len(trans_data[1])
         emit_prob = 0
 
         for i in range(x_len):
-            emit_prob += np.log(self.px2[trans_data[0][i]])
+            emit_prob += np.log(self.px[trans_data[0][i]])
         for i in range(y_len):
-            emit_prob += np.log(self.py2[trans_data[1][i]])
+            emit_prob += np.log(self.py[trans_data[1][i]])
         emit_prob = np.exp(emit_prob)
         temp_lik = self.cal_one_lik(trans_data)
-
-        # exp(-AIC/2)
-        # obs_n = len(self.obs2int_dict)
-        # emit_prob = np.exp(np.log(emit_prob)-2*(obs_n-1))
-        # temp_lik = np.exp(np.log(temp_lik)-(obs_n+1)*(obs_n+4)/2)
-
         result = temp_lik/(emit_prob+temp_lik)
         return result
     
     def cal_all_lr(self, trans_full_data, parallel = True, cores = 30):
-        # self.cal_p2(trans_full_data, store = False)
         if parallel:
             pool = mp.Pool(processes = cores)
             all_lr = pool.map(self.cal_one_lr, trans_full_data)
@@ -1156,7 +930,7 @@ seeds = None, store_all_seeds = False, parallel = True, cores = 30, iterations =
         seq_data.append([i[0],i[1]])
     print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M'))
     print('Training begins with the seed:', 'unif')
-    model1 = dhmm(mec_state,  state_d, obs2int_dict, state2int_dict,
+    model1 = sim(mec_state,  state_d, obs2int_dict, state2int_dict,
         trans_restrict = trans_restrict)
     trans_all_data = model1.trans_all_seq(seq_data)
     
@@ -1173,13 +947,15 @@ seeds = None, store_all_seeds = False, parallel = True, cores = 30, iterations =
         if i>50 and abs(loglik_trace[-2] - loglik_trace[-1]) < 1e-6:
             break
 
-    model1.cal_p2(trans_all_data, os.path.join(store_path,'unif'), store = True)
     model1.store_para(os.path.join(store_path,'unif'))
     np.savetxt(os.path.join(store_path,'unif')+'_'+'lik.txt', loglik_trace, fmt=store_digit)
 
+    state_result = model1.pred_all_seq_state(trans_all_data, parallel = parallel, cores = cores)
+    state_result.to_csv(os.path.join(store_path,'unif')+'_'+'train_states.csv', index=False, doublequote = False)
+
     if not store_all_seeds:
-        model1.cal_p2(trans_all_data, os.path.join(store_path,'ml'), store = True)
         model1.store_para(os.path.join(store_path,'ml'))
+        state_result.to_csv(os.path.join(store_path,'ml')+'_'+'train_states.csv', index=False, doublequote = False)
         lik_result = loglik_trace[-1]
         sel_seed = 'unif'
 
@@ -1187,7 +963,7 @@ seeds = None, store_all_seeds = False, parallel = True, cores = 30, iterations =
         for seed in seeds:
             print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M'))
             print('Training begins with the seed:', str(seed))
-            model1 = dhmm(mec_state,  state_d, obs2int_dict, state2int_dict,
+            model1 = sim(mec_state,  state_d, obs2int_dict, state2int_dict,
                 trans_restrict = trans_restrict,seed = seed)
             loglik_trace = [] 
             for i in range(iterations):
@@ -1202,15 +978,16 @@ seeds = None, store_all_seeds = False, parallel = True, cores = 30, iterations =
                 if i>50 and abs(loglik_trace[-2] - loglik_trace[-1]) < 1e-6:
                     break
 
-            model1.cal_p2(trans_all_data, os.path.join(store_path,str(seed)), store = True)
             model1.store_para(os.path.join(store_path,str(seed)))
             np.savetxt(os.path.join(store_path,str(seed))+'_'+'lik.txt', loglik_trace, fmt=store_digit)
-            
+            state_result = model1.pred_all_seq_state(trans_all_data, parallel = parallel, cores = cores)
+            state_result.to_csv(os.path.join(store_path,str(seed))+'_'+'train_states.csv', index=False, doublequote = False)
+
             if not store_all_seeds:
-                model1.cal_p2(trans_all_data, os.path.join(store_path,'ml'), store = True)
                 temp_lik = loglik_trace[-1]
                 if temp_lik>lik_result:
                     model1.store_para(os.path.join(store_path,'ml'))
+                    state_result.to_csv(os.path.join(store_path,'ml')+'_'+'train_states.csv', index=False, doublequote = False)
                     lik_result = temp_lik
                     sel_seed = str(seed)
 
@@ -1246,8 +1023,8 @@ iterations = 1000, use_existing_est = False, pred_store_path = None):
     if not all_seed_pred:
         print('The seed of max likelihood is predicting.')
         store_seed_path = os.path.join(store_path,'ml')
-        init_dis, trans_mat, px, py, pm, p_mx, p_my, dire_dis, px2, py2 = read_para(store_seed_path, p2 = True)
-        model1 = dhmm(mec_state = mec_state, state_d= state_d, 
+        init_dis, trans_mat, px, py, pm, p_mx, p_my, dire_dis, px2, py2 = read_para(store_seed_path)
+        model1 = sim(mec_state = mec_state, state_d= state_d, 
             obs2int_dict = obs2int_dict, state2int_dict = state2int_dict, 
             init_dis = init_dis, trans_mat = trans_mat, 
             px = px, py = py, pm = pm, p_mx = p_mx, p_my = p_my, 
@@ -1258,12 +1035,15 @@ iterations = 1000, use_existing_est = False, pred_store_path = None):
             seq_data.append([i[0],i[1]])
         trans_all_test_data = model1.trans_all_seq(seq_data)
         pred_score = model1.cal_all_lr(trans_all_test_data, parallel = parallel, cores = cores)
+        state_result = model1.pred_all_seq_state(trans_all_test_data, parallel = parallel, cores = cores)
         temp_result = test_data.copy()
         temp_result['pred_score'] = pred_score
         if pred_store_path is None:
+            state_result.to_csv(store_seed_path+'_'+'pred_states.csv', index=False, doublequote = False)
             temp_result.to_csv(store_seed_path+'_'+'pred_score.csv', index=False, doublequote = False)
         else:
             pred_seed_path = os.path.join(pred_store_path,'ml')
+            state_result.to_csv(pred_seed_path+'_'+'pred_states.csv', index=False, doublequote = False)
             temp_result.to_csv(pred_seed_path+'_'+'pred_score.csv', index=False, doublequote = False)
     else:
         if seeds is None:
@@ -1273,8 +1053,8 @@ iterations = 1000, use_existing_est = False, pred_store_path = None):
             print('Seed',str(seed),'predicting.')
             store_seed_path = os.path.join(store_path,str(seed))
 
-            init_dis, trans_mat, px, py, pm, p_mx, p_my, dire_dis, px2, py2 = read_para(store_seed_path, p2 = True)
-            model1 = dhmm(mec_state = mec_state, state_d= state_d, 
+            init_dis, trans_mat, px, py, pm, p_mx, p_my, dire_dis, px2, py2 = read_para(store_seed_path)
+            model1 = sim(mec_state = mec_state, state_d= state_d, 
                 obs2int_dict = obs2int_dict, state2int_dict = state2int_dict, 
                 init_dis = init_dis, trans_mat = trans_mat, 
                 px = px, py = py, pm = pm, p_mx = p_mx, p_my = p_my,
@@ -1286,73 +1066,14 @@ iterations = 1000, use_existing_est = False, pred_store_path = None):
                 seq_data.append([i[0],i[1]])
             trans_all_test_data = model1.trans_all_seq(seq_data)
             pred_score = model1.cal_all_lr(trans_all_test_data, parallel = parallel, cores = cores)
+            state_result = model1.pred_all_seq_state(trans_all_test_data, parallel = parallel, cores = cores)
             temp_result = test_data.copy()
             temp_result['pred_score'] = pred_score
             if pred_store_path is None:
+                state_result.to_csv(store_seed_path+'_'+'pred_states.csv', index=False, doublequote = False)
                 temp_result.to_csv(store_seed_path+'_'+'pred_score.csv', index=False, doublequote = False)
             else:
                 pred_seed_path = os.path.join(pred_store_path,str(seed))
+                state_result.to_csv(pred_seed_path+'_'+'pred_states.csv', index=False, doublequote = False)
                 temp_result.to_csv(pred_seed_path+'_'+'pred_score.csv', index=False, doublequote = False)
     print('Succeed.')
-
-
-# train_data and test_data are both dataframes: the first column is X sequence, 
-# the second column is Y sequence. 
-# all_seed_pred: True is to use all seeds to predict; False is to only use the seed of max likelihood
-def pred_test_contact(train_data, test_data, all_seed_pred = False, store_path = '',
-mec_state = ['x','y','m'], state_d= [[(1,0)],[(0,1)],[(1,1)]], 
-obs2int_dict = obs2int_dict, state2int_dict = {'X':0 , 'Y':1, 'M':2}, 
-trans_restrict=[(1,0)], seeds = None, parallel = True, cores = 30, 
-iterations = 1000, use_existing_est = False):
-    print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M'))
-    if not use_existing_est:
-        print('Training begins.')
-        est_para(train_data, store_path = store_path,
-        mec_state = mec_state, state_d = state_d, 
-        obs2int_dict = obs2int_dict, state2int_dict = state2int_dict, 
-        trans_restrict=trans_restrict,
-        seeds = seeds, store_all_seeds = all_seed_pred, 
-        parallel = parallel, cores = cores, iterations = iterations)
-    else:
-        print('Use previous estimations.')
-
-    print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M'))
-    print('Predicting begins.')
-    if not all_seed_pred:
-        print('The seed of max likelihood is predicting.')
-        store_seed_path = os.path.join(store_path,'ml')
-        init_dis, trans_mat, px, py, pm, p_mx, p_my, dire_dis = read_para(store_seed_path, p2 = False)
-        model1 = dhmm(mec_state = mec_state, state_d= state_d, 
-            obs2int_dict = obs2int_dict, state2int_dict = state2int_dict, 
-            init_dis = init_dis, trans_mat = trans_mat, 
-            px = px, py = py, pm = pm, p_mx = p_mx, p_my = p_my, 
-            dire_dis = dire_dis, trans_restrict = trans_restrict)
-        seq_data = []
-        for _, i in test_data.iterrows():
-            seq_data.append([i[0],i[1]])
-        trans_all_test_data = model1.trans_all_seq(seq_data)
-        all_contact_result = model1.get_all_contact(trans_all_test_data, parallel = parallel, cores = cores)
-        all_contact_result.to_csv(store_seed_path+'_'+'all_contact.csv', index=False, doublequote = False)
-    else:
-        if seeds is None:
-            seeds = np.array([])
-        seeds = np.append(seeds, 'unif')
-        for seed in seeds:
-            print('Seed',str(seed),'predicting.')
-            store_seed_path = os.path.join(store_path,str(seed))
-            init_dis, trans_mat, px, py, pm, p_mx, p_my, dire_dis = read_para(store_seed_path, p2 = False)
-            model1 = dhmm(mec_state = mec_state, state_d= state_d, 
-                obs2int_dict = obs2int_dict, state2int_dict = state2int_dict, 
-                init_dis = init_dis, trans_mat = trans_mat, 
-                px = px, py = py, pm = pm, p_mx = p_mx, p_my = p_my, 
-                dire_dis = dire_dis, trans_restrict = trans_restrict)
-            seq_data = []
-            for _, i in test_data.iterrows():
-                seq_data.append([i[0],i[1]])
-            trans_all_test_data = model1.trans_all_seq(seq_data)
-            all_contact_result = model1.get_all_contact(trans_all_test_data, parallel = parallel, cores = cores)
-            all_contact_result.to_csv(store_seed_path+'_'+'all_contact.csv', index=False, doublequote = False)
-    print('Succeed.')
-        
-# mcc
-# np.corrcoef(label, pred_score)
