@@ -2,7 +2,15 @@
 `SIM` is a probabilistic generative model for sequence interaction. It can be trained only by the paired binding sequences.
 
 <!-- framework.png -->
+## Framework
+SIM utilizes a training dataset consisting of numerous paired sequences, where the first column includes the CDR3$\beta$ regions of TCR sequences and the second column lists the corresponding binding peptides. Model parameters were derived from this training data. Following parameter estimation, peptides capable of binding to specific TCR repertoires were synthetically generated and their sequence logos were displayed. The effectiveness of the model was assessed on a testing dataset by comparing the area under the ROC curve (AUC) with those of existing algorithms. Additionally, the binding residues identified by the model for each sequence pair were validated through experimental structural data.
+![SIM framework for TCR-peptide binding analysis](./figs/framework.png)
 
+## Model
+The following figure shows how SIM models the paired sequence data.
+
+a). A pair of binding sequences. The red dashed line represents the potential interactions. b). Model parameters of SIM. The depth of the color indicates the magnitude of the parameter value. c). Data generation process. We show how SIM models the paired sequences, i.e., how the paired sequences is generated. The black arrows represent samples drawn from a specific distribution. The dark blue letter and arrow denote the parameters involved in this sampling process. The colored areas highlight residues with interactions. d). Visitation grid. The steps in the sampling process form a path from the origin to the top-right corner. The horizontal and vertical axes represent the observed amino acids in sequences X and Y, respectively. Each red arrow indicates a step. The colored areas mark the amino acids with interactions.
+![SIM for a pair of binding amino acid sequences](./figs/model_with_para.png)
 
 ## Installation
 You can install the released version of SIM from GitHub with:
