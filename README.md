@@ -1,5 +1,5 @@
 # SIM
-`SIM` is a probabilistic generative model for sequence interaction. It can be trained only by the paired binding sequences.
+`SIM` is a probabilistic generative model for sequence interaction. It is trained exclusively on positive data, capable of generating peptides that bind specifically to a given TCR repertoire, and can distinguish between the non-contributory residues and those that are crucial for binding.
 
 <!-- framework.png -->
 ## Framework
