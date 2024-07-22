@@ -111,7 +111,6 @@ class sim:
         obs2int_dict = obs2int_dict, state2int_dict = {'X':0 , 'Y':1, 'M':2}, 
     init_dis = None, trans_mat = None, 
     px = None, py = None, pm = None, p_mx = None, p_my = None, 
-    px2 = None, py2 = None, # only useful for calculating lr score
     dire_dis = None, seed = None,
     trans_restrict = [(1,0)], sym_restrict = None, real_input = False):
 
@@ -235,14 +234,6 @@ class sim:
             if np.abs(self.pm.sum() - 1.) > 0.00001:
                 raise ValueError('The sum of pm should be 1!')
 
-        if py2 is not None:
-            py2 = py2 + pesdu_count
-            self.py2 = deepcopy(py2/py2.sum())
-        
-        if px2 is not None:
-            px2 = px2 + pesdu_count
-            self.px2 = deepcopy(px2/px2.sum())
-
 
         if real_input:
             self.real_input = real_input
@@ -258,8 +249,6 @@ class sim:
         np.savetxt(store_path+'_'+'pm.txt', self.pm, fmt=store_digit)
         np.savetxt(store_path+'_'+'p_mx.txt', self.p_mx, fmt=store_digit)
         np.savetxt(store_path+'_'+'p_my.txt', self.p_mx, fmt=store_digit)
-        # np.savetxt(store_path+'_'+'px2.txt', self.px2, fmt=store_digit)
-        # np.savetxt(store_path+'_'+'py2.txt', self.py2, fmt=store_digit)
         for i in range(len(self.mec_state)):
             np.savetxt(store_path+'_'+str(i)+'dire_dis.txt', self.dire_dis[i], fmt=store_digit)
 
@@ -922,7 +911,7 @@ def est_para(raw_data, store_path = '',
 mec_state = ['x','y','m'], state_d= [[(1,0)],[(0,1)],[(1,1)]], 
 obs2int_dict = obs2int_dict, state2int_dict = {'X':0 , 'Y':1, 'M':2}, 
 trans_restrict=[(1,0)],
-seeds = None, store_all_seeds = False, parallel = True, cores = 30, iterations = 1000):
+seeds = None, store_all_seeds = True, parallel = True, cores = 30, iterations = 1000):
     seq_data = []
     store_digit = '%.'+str(10)+'f'
     lik_result = 0
@@ -1023,12 +1012,11 @@ iterations = 1000, use_existing_est = False, pred_store_path = None):
     if not all_seed_pred:
         print('The seed of max likelihood is predicting.')
         store_seed_path = os.path.join(store_path,'ml')
-        init_dis, trans_mat, px, py, pm, p_mx, p_my, dire_dis, px2, py2 = read_para(store_seed_path)
+        init_dis, trans_mat, px, py, pm, p_mx, p_my, dire_dis = read_para(store_seed_path)
         model1 = sim(mec_state = mec_state, state_d= state_d, 
             obs2int_dict = obs2int_dict, state2int_dict = state2int_dict, 
             init_dis = init_dis, trans_mat = trans_mat, 
             px = px, py = py, pm = pm, p_mx = p_mx, p_my = p_my, 
-            px2 = px2, py2 = py2,
             dire_dis = dire_dis, trans_restrict = trans_restrict)
         seq_data = []
         for _, i in test_data.iterrows():
@@ -1053,12 +1041,11 @@ iterations = 1000, use_existing_est = False, pred_store_path = None):
             print('Seed',str(seed),'predicting.')
             store_seed_path = os.path.join(store_path,str(seed))
 
-            init_dis, trans_mat, px, py, pm, p_mx, p_my, dire_dis, px2, py2 = read_para(store_seed_path)
+            init_dis, trans_mat, px, py, pm, p_mx, p_my, dire_dis= read_para(store_seed_path)
             model1 = sim(mec_state = mec_state, state_d= state_d, 
                 obs2int_dict = obs2int_dict, state2int_dict = state2int_dict, 
                 init_dis = init_dis, trans_mat = trans_mat, 
                 px = px, py = py, pm = pm, p_mx = p_mx, p_my = p_my,
-                px2 = px2, py2 = py2, 
                 dire_dis = dire_dis, trans_restrict = trans_restrict)
 
             seq_data = []

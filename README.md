@@ -30,4 +30,4 @@ Then you can enter the python and test the package
 
 
 ## Reference
--   Ran, L. et al. (2023+), “SIM: Probabilistic Generative Model for Sequence Interaction with Application to TCR-peptide Binding,” Working Paper.
+-   Ran, L. et al. (2024+), “SIM: Probabilistic Generative Model for Sequence Interaction with Application to TCR-peptide Binding,” Working Paper.
