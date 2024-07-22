@@ -24,10 +24,11 @@ conda install pip
 pip install .
 ```
 
-Then you can enter the python and test the package
-...
+Then you can enter the python and test the package.
 
+## Usage
+The software's functionality is demonstrated in the `demo.ipynb` file.
 
 
 ## Reference
--   Ran, L. et al. (2024+), “SIM: Probabilistic Generative Model for Sequence Interaction with Application to TCR-peptide Binding,” Working Paper.
+-   Ran, L. et al. (2024+), “SIM: Probabilistic Generative Model for Sequence Interaction with Application to TCR-peptide Binding,” working Paper.
