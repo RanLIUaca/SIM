@@ -3,7 +3,7 @@
 
 <!-- framework.png -->
 ## Framework
-SIM utilizes a training dataset consisting of numerous paired sequences, where the first column includes the CDR3$\beta$ regions of TCR sequences and the second column lists the corresponding binding peptides. Model parameters were derived from this training data. Following parameter estimation, peptides capable of binding to specific TCR repertoires were synthetically generated and their sequence logos were displayed. The effectiveness of the model was assessed on a testing dataset by comparing the area under the ROC curve (AUC) with those of existing algorithms. Additionally, the binding residues identified by the model for each sequence pair were validated through experimental structural data.
+SIM utilizes a training dataset consisting of numerous paired sequences, where the first column includes the CDR3beta regions of TCR sequences and the second column lists the corresponding binding peptides. Model parameters were derived from this training data. Following parameter estimation, peptides capable of binding to specific TCR repertoires were synthetically generated and their sequence logos were displayed. The effectiveness of the model was assessed on a testing dataset by comparing the area under the ROC curve (AUC) with those of existing algorithms. Additionally, the binding residues identified by the model for each sequence pair were validated through experimental structural data.
 ![SIM framework for TCR-peptide binding analysis](./figs/framework.png)
 
 ## Model
