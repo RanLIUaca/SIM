@@ -106,7 +106,7 @@ aa_kinds = 'ARNDCQEGHILKMFPSTWYV'
 for v, k in enumerate(aa_kinds):
     obs2int_dict[k] = int(v)
 
-class sim:
+class sim_model:
     def __init__(self,  mec_state = ['x','y','m'], state_d= [[(1,0)],[(0,1)],[(1,1)]], 
         obs2int_dict = obs2int_dict, state2int_dict = {'X':0 , 'Y':1, 'M':2}, 
     init_dis = None, trans_mat = None, 
@@ -919,7 +919,7 @@ seeds = None, store_all_seeds = True, parallel = True, cores = 30, iterations = 
         seq_data.append([i[0],i[1]])
     print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M'))
     print('Training begins with the seed:', 'unif')
-    model1 = sim(mec_state,  state_d, obs2int_dict, state2int_dict,
+    model1 = sim_model(mec_state,  state_d, obs2int_dict, state2int_dict,
         trans_restrict = trans_restrict)
     trans_all_data = model1.trans_all_seq(seq_data)
     
@@ -952,7 +952,7 @@ seeds = None, store_all_seeds = True, parallel = True, cores = 30, iterations = 
         for seed in seeds:
             print(datetime.datetime.now().strftime('%Y-%m-%d %H:%M'))
             print('Training begins with the seed:', str(seed))
-            model1 = sim(mec_state,  state_d, obs2int_dict, state2int_dict,
+            model1 = sim_model(mec_state,  state_d, obs2int_dict, state2int_dict,
                 trans_restrict = trans_restrict,seed = seed)
             loglik_trace = [] 
             for i in range(iterations):
@@ -1013,7 +1013,7 @@ iterations = 1000, use_existing_est = False, pred_store_path = None):
         print('The seed of max likelihood is predicting.')
         store_seed_path = os.path.join(store_path,'ml')
         init_dis, trans_mat, px, py, pm, p_mx, p_my, dire_dis = read_para(store_seed_path)
-        model1 = sim(mec_state = mec_state, state_d= state_d, 
+        model1 = sim_model(mec_state = mec_state, state_d= state_d, 
             obs2int_dict = obs2int_dict, state2int_dict = state2int_dict, 
             init_dis = init_dis, trans_mat = trans_mat, 
             px = px, py = py, pm = pm, p_mx = p_mx, p_my = p_my, 
@@ -1042,7 +1042,7 @@ iterations = 1000, use_existing_est = False, pred_store_path = None):
             store_seed_path = os.path.join(store_path,str(seed))
 
             init_dis, trans_mat, px, py, pm, p_mx, p_my, dire_dis= read_para(store_seed_path)
-            model1 = sim(mec_state = mec_state, state_d= state_d, 
+            model1 = sim_model(mec_state = mec_state, state_d= state_d, 
                 obs2int_dict = obs2int_dict, state2int_dict = state2int_dict, 
                 init_dis = init_dis, trans_mat = trans_mat, 
                 px = px, py = py, pm = pm, p_mx = p_mx, p_my = p_my,
