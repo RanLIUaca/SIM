@@ -17,19 +17,21 @@ You can install the released version of SIM from GitHub with:
 1. Clone the GitHub repository and move to the directory
 ```bash
 git clone https://github.com/RanLIUaca/SIM
-cd SIM/sim/sim
 ```
+or download the SIM-main.zip file and unzip it.
+
 
 2. (Recommended) Create a virtual environment 
 ```bash
-conda create sim_venv
+# conda deactivate
+conda create --name sim_venv python=3.8
 conda activate sim_venv
-conda install pip
 ```
 
 3. Install the required packages 
 ```bash
-pip install .
+cd SIM/sim
+python -m pip install .
 ```
 
 Then you can enter the python and test the package.
