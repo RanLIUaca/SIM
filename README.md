@@ -41,4 +41,4 @@ The software's functionality is demonstrated in the `demo.ipynb` file.
 
 
 ## Reference
--   Ran, L. et al. (2024+), “SIM: Probabilistic Generative Model for Sequence Interaction with Application to TCR-peptide Binding,” working Paper.
+-   Ran, L. et al. (2024+), “Sequence interaction model with Applications to TCR-peptide Binding,” working Paper.
