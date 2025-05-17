@@ -41,4 +41,4 @@ The software's functionality is demonstrated in the `demo.ipynb` file.
 
 
 ## Reference
--   Ran, L. et al. (2024+), “Sequence interaction model with Applications to TCR-peptide Binding,” working Paper.
+-   Liu, R., Tang, X., Fan, X. (2025+), Sequence interaction model with applications to TCR-peptide binding, working Paper.
