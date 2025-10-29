@@ -41,4 +41,7 @@ The software's functionality is demonstrated in the `demo.ipynb` file.
 
 
 ## Reference
--   Liu, R., Tang, X., Fan, X. (2025+), Sequence interaction model with applications to TCR-peptide binding, working Paper.
+-   Liu, R., Tang, X., Fan, X. (2025+), Sequence interaction model with applications to TCR-peptide binding, Annals of Applied Statistics, accepted.
+
+## Contact
+Ran Liu: ranliu@bnu.edu.cn
